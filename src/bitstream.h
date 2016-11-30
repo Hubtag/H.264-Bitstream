@@ -2,6 +2,10 @@
 #define BS_BITSTREAM_H
 #include <string.h>
 
+#ifdef _cplusplus
+extern "C"{
+#endif
+
 /*! \addtogroup bitstream Bitstream
     @{
 */
@@ -72,6 +76,14 @@ size_t bs_remaining( bs_stream_t stream );
 */
 void bs_seek( bs_stream_t stream, int offset, bs_seek_t whence );
 
+/*! \brief      Reads a single bit from the bitstream.
+    \param      stream  The bitstream to read from.
+    \return     Returns the value of the next bit which was read.
+    \remarks    Attempting to read more bits than remain in the stream will result in a value of 0.
+    \memberof   bs_stream_t
+*/
+unsigned int bs_read_bit( bs_stream_t stream );
+
 /*! \brief      Reads an unsigned integer from the bitstream.
     \param      stream  The bitstream to read from.
     \param      bits    The number of bits to read. Undefined for bits > 8 * sizeof( unsigned int ).
@@ -101,4 +113,7 @@ int bs_read_int( bs_stream_t stream, size_t bits );
 unsigned int bs_read_exp_golomb( bs_stream_t stream );
 
 
+#ifdef _cplusplus
+}
+#endif
 #endif

@@ -1,6 +1,10 @@
 #include "bitstream.h"
 #include <stdlib.h>
 
+#ifdef _cplusplus
+extern "C"{
+#endif
+
 struct bs_stream{
     const unsigned char * data;
     size_t offset;
@@ -39,7 +43,7 @@ void bs_seek( bs_stream_t stream, int offset, bs_seek_t whence ){
     switch(whence){
         case BS_SEEK_OFFSET:
             if( offset < 0 ){
-                if( stream->offset > -offset ){
+                if( stream->offset > (size_t) -offset ){
                     stream->offset += offset;
                 }
                 else{
@@ -59,7 +63,7 @@ void bs_seek( bs_stream_t stream, int offset, bs_seek_t whence ){
             if( offset < 0 ){
                 offset = 0;
             }
-            if( stream->length > offset ){
+            if( stream->length > (size_t) offset ){
                 stream->offset = stream->length - offset;
             }
             else{
@@ -70,7 +74,7 @@ void bs_seek( bs_stream_t stream, int offset, bs_seek_t whence ){
             if( offset < 0 ){
                 offset = 0;
             }
-            if( stream->length > offset ){
+            if( stream->length > (size_t) offset ){
                 stream->offset = offset;
             }
             else{
@@ -79,6 +83,17 @@ void bs_seek( bs_stream_t stream, int offset, bs_seek_t whence ){
             break;
         default: break;
     }
+}
+
+unsigned int bs_read_bit( bs_stream_t stream ){
+    size_t byte = stream->offset / 8;
+    size_t bit = stream->offset % 8;
+    if( stream->offset < stream->length ){
+        stream->offset++;
+        return ((stream->data[byte] >> ( 7 - bit )) & 1) != 0;
+    }
+    stream->offset ++;
+    return 0;
 }
 
 unsigned int bs_read_uint( bs_stream_t stream, size_t bits ){
@@ -111,7 +126,7 @@ unsigned int bs_read_uint( bs_stream_t stream, size_t bits ){
 
 int bs_read_int( bs_stream_t stream, size_t bits ){
     unsigned int ret = bs_read_uint( stream, bits );
-    auto mask = 1 << bits - 1;
+    unsigned int mask = (1 << bits) - 1;
     if( (ret & mask) != 0 ){
         return -(ret & (mask - 1));
     }
@@ -132,7 +147,7 @@ unsigned int bs_read_exp_golomb( bs_stream_t stream ){
     }
     if( byte * 8 > stream->length ){
         stream->offset = stream->length;
-        return (size_t)-1;
+        return (unsigned int)-1;
     }
 
     size_t log2 = 8;
@@ -143,8 +158,15 @@ unsigned int bs_read_exp_golomb( bs_stream_t stream ){
     len += log2;
     if( len + stream->offset > stream->length ){
         stream->offset = stream->length;
-        return (size_t)-1;
+        return (unsigned int)-1;
     }
     stream->offset += len;
+    if( stream->offset > stream->length ){
+        stream->offset = stream->length;
+    }
     return bs_read_uint( stream, len + 1 ) - 1;
 }
+
+#ifdef _cplusplus
+}
+#endif

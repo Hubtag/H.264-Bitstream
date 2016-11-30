@@ -1,19 +1,26 @@
-#define b00000000 "\x0"
-#define b00000001 "\x1"
-#define b00000010 "\x2"
-#define b00000011 "\x3"
-#define b00000100 "\x4"
-#define b00000101 "\x5"
-#define b00000110 "\x6"
-#define b00000111 "\x7"
-#define b00001000 "\x8"
-#define b00001001 "\x9"
-#define b00001010 "\xa"
-#define b00001011 "\xb"
-#define b00001100 "\xc"
-#define b00001101 "\xd"
-#define b00001110 "\xe"
-#define b00001111 "\xf"
+#ifndef BS_BIN_H
+#define BS_BIN_H
+
+#ifdef _cplusplus
+extern "C"{
+#endif
+
+#define b00000000 "\x00"
+#define b00000001 "\x01"
+#define b00000010 "\x02"
+#define b00000011 "\x03"
+#define b00000100 "\x04"
+#define b00000101 "\x05"
+#define b00000110 "\x06"
+#define b00000111 "\x07"
+#define b00001000 "\x08"
+#define b00001001 "\x09"
+#define b00001010 "\x0a"
+#define b00001011 "\x0b"
+#define b00001100 "\x0c"
+#define b00001101 "\x0d"
+#define b00001110 "\x0e"
+#define b00001111 "\x0f"
 #define b00010000 "\x10"
 #define b00010001 "\x11"
 #define b00010010 "\x12"
@@ -254,3 +261,8 @@
 #define b11111101 "\xfd"
 #define b11111110 "\xfe"
 #define b11111111 "\xff"
+
+#ifdef _cplusplus
+}
+#endif
+#endif
