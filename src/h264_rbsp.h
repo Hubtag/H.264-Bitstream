@@ -35,9 +35,11 @@ struct vui_parameters{
     bool overscan_appropriate;
     uint8_t video_format;
     bool video_full_range;
+    bool color_description_present;
     uint8_t color_primaries;
     uint8_t transfer_characteristics;
     uint8_t matrix_coefficients;
+    uint32_t chroma_loc_info_present;
     uint32_t chroma_sample_loc_type_top_field;
     uint32_t chroma_sample_loc_type_bottom_field;
     uint32_t num_units_in_tick;
@@ -137,6 +139,10 @@ int read_hrd_parameters( bs_stream_t stream, struct hrd_parameters * params );
 int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params );
 
 int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * params );
+int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * params, struct seq_parameter_set * seq_params );
+
+size_t get_x264_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq );
+size_t get_ffmpeg_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq );
 
 #ifdef _cplusplus
 }

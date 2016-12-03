@@ -92,7 +92,6 @@ unsigned int bs_read_bit( bs_stream_t stream ){
         stream->offset++;
         return ((stream->data[byte] >> ( 7 - bit )) & 1) != 0;
     }
-    stream->offset ++;
     return 0;
 }
 
@@ -121,6 +120,9 @@ unsigned int bs_read_uint( bs_stream_t stream, size_t bits ){
         ret >>= i * 8 + 8 - bit - bits - 8;
     }
     stream->offset += bits;
+    if( stream->offset > stream->length ){
+        stream->offset = stream->length;
+    }
     return ret;
 }
 
