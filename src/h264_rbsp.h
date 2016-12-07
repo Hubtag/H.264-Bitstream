@@ -141,8 +141,20 @@ int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params );
 int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * params );
 int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * params, struct seq_parameter_set * seq_params );
 
+#define AVCC_MAX_PPS 1
+#define AVCC_MAX_SPS 1
+struct avcc_data{
+    uint8_t version, profile, compat, level;
+    int nalu_length_size_minus1;
+    size_t pps_count, sps_count;
+    struct seq_parameter_set sps[AVCC_MAX_SPS];
+    struct pic_parameter_set pps[AVCC_MAX_PPS];
+};
+
+int read_avcc_data( bs_stream_t stream, struct avcc_data * data );
+
 size_t get_x264_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq );
-size_t get_ffmpeg_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq );
+size_t get_ffmpeg_params(char * buffer, size_t len, struct avcc_data * data );
 
 #ifdef _cplusplus
 }

@@ -113,6 +113,16 @@ int bs_read_int( bs_stream_t stream, size_t bits );
 unsigned int bs_read_exp_golomb( bs_stream_t stream );
 
 
+/*! \brief      Reads a number of bytes from the bitstream into \a dest.
+    \param      stream  The bitstream to read from.
+    \param      dest    The buffer to read into.
+    \param      len     The length of the buffer and the number of bytes to read.
+    \return     Returns the number of bytes actually read (the end of the buffer will be padded with zeroes though)
+    \memberof   bs_stream_t
+*/
+size_t bs_read_bytes( bs_stream_t stream, void * dest, size_t len );
+
+
 #ifdef _cplusplus
 }
 #endif

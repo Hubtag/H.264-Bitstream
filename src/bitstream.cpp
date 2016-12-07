@@ -169,6 +169,36 @@ unsigned int bs_read_exp_golomb( bs_stream_t stream ){
     return bs_read_uint( stream, len + 1 ) - 1;
 }
 
+size_t bs_read_bytes( bs_stream_t stream, void * dest, size_t len ){
+    unsigned char * out = (unsigned char *) dest;
+    size_t byte = stream->offset / 8;
+    size_t bit = stream->offset % 8;
+    size_t read_len = len;
+    memset( dest, 0, len );
+    if( read_len > stream->length + stream->offset ){
+        read_len = stream->length - stream->offset;
+    }
+    memcpy( out, stream->data + byte, read_len );
+    //If we're not byte aligned, we need to shift everything to become byte aligned.
+    if( bit != 0 ){
+        //Shift everything over
+        size_t mask = ( 1 << bit ) - 1;
+        for( size_t i = 0; i + 1 < read_len; ++i ){
+            out[i] = (out[i] << bit) | ((out[i + 1] >> (8 - bit)) & mask );
+        }
+        //Get the last byte
+        unsigned char last = 0;
+        if( stream->offset + read_len < stream->length ){
+            last = stream->data[read_len];
+        }
+        //Fill it in
+        if( read_len > 0 ){
+            out[read_len - 1] = (out[read_len - 1] << bit) | ((last >> (8 - bit)) & mask );
+        }
+    }
+    return read_len;
+}
+
 #ifdef _cplusplus
 }
 #endif

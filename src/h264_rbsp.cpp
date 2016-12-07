@@ -1,5 +1,6 @@
 #include "h264_rbsp.h"
 #include <math.h>
+#include <stdlib.h>
 
 #ifdef _cplusplus
 extern "C"{
@@ -491,7 +492,13 @@ size_t write_fmt( char * buffer, size_t len, size_t offset, const char * format,
     return write_amt;
 }
 
-size_t get_ffmpeg_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq ){
+size_t get_ffmpeg_params(char * buffer, size_t len, struct avcc_data * data ){
+    if( data->pps_count == 0 || data->sps_count == 0 ){
+        return 0;
+    }
+    struct pic_parameter_set * pic = data->pps;
+    struct seq_parameter_set * seq = data->sps;
+
     size_t out_len = 0;
     out_len += write_fmt( buffer, len, out_len, "-pix_fmt %s ", get_pix_name( seq ) );
     out_len += write_fmt( buffer, len, out_len, "-profile:v %s ", get_profile_name( seq->profile_idc ) );
@@ -558,6 +565,98 @@ size_t get_x264_params(char * buffer, size_t len, struct pic_parameter_set * pic
     out_len += write_fmt( buffer, len, out_len, "no-weightb=%d:", !pic->weighted_bipred_idc );
     out_len += write_fmt( buffer, len, out_len, "weightp=%d:", pic->weighted_pred_flag );
     return out_len;
+}
+
+void * safe_realloc( void * data, size_t new_size, size_t * old_size ){
+    if( new_size < *old_size ){
+        return data;
+    }
+    if( new_size > 100000 ){
+        free( data );
+        return nullptr;
+    }
+    void * new_data = realloc( data, new_size );
+    if( new_data == nullptr ){
+        free( data );
+        return nullptr;
+    }
+    *old_size = new_size;
+    return new_data;
+}
+
+bool verify_nal_type( bs_stream_t stream, size_t ref, size_t type ){
+    if( bs_read_bit( stream ) ){
+        return false;
+    }
+    if( !bs_read_uint( stream, 2 ) != !ref ){ //Verify that if ref > 0, then nal_ref_idc > 0 as well (and the converse)
+        return false;
+    }
+    return type == bs_read_uint( stream, 5 );
+}
+
+int read_avcc_data( bs_stream_t stream, struct avcc_data * data ){
+    uint32_t version = 0;
+    size_t buffer_size = 0;
+    void * buffer = safe_realloc(nullptr, 10, &buffer_size);
+    while( version == 0 && bs_remaining( stream ) > 0 ){
+        version = bs_read_uint( stream, 8 );
+    }
+    if( version != 1 ){
+        return -1;
+    }
+    data->profile = bs_read_uint( stream, 8 );
+    data->compat = bs_read_uint( stream, 8 );
+    data->level = bs_read_uint( stream, 8 );
+    if( bs_read_uint( stream, 6 ) != 63 ){ //63 is the least sig. 6 bits set
+        return -1;
+    }
+    data->nalu_length_size_minus1 = bs_read_uint( stream, 2 );
+    if( bs_read_uint( stream, 3 ) != 7 ){ //7 is the least sig. 3 bits set
+        return -1;
+    }
+    data->sps_count = bs_read_uint( stream, 5 );
+    for( size_t i = 0; i < data->sps_count; ++i ){
+        size_t len = bs_read_uint( stream, 16 );
+        size_t offset = bs_tell( stream );
+        if( i < AVCC_MAX_SPS ){
+            buffer = safe_realloc( buffer, len, &buffer_size );
+            if( buffer == nullptr ){
+                return -1;
+            }
+            bs_read_bytes( stream, buffer, len );
+            size_t new_len = nal_to_rbsp((char*)buffer, len);
+            bs_stream_t new_stream = bs_create( buffer, new_len * 8, 0 );
+            if( verify_nal_type( new_stream, 1, 7 ) ){
+                read_seq_parameter_set( new_stream, &data->sps[i] );
+            }
+            bs_destroy( new_stream );
+        }
+        bs_seek( stream, offset + len, BS_SEEK_SET );
+    }
+    data->pps_count = bs_read_uint( stream, 8 );
+    for( size_t i = 0; i < data->pps_count; ++i ){
+        size_t len = bs_read_uint( stream, 16 );
+        size_t offset = bs_tell( stream );
+        if( i < AVCC_MAX_PPS ){
+            struct seq_parameter_set * parent = data->sps + i;
+            if( i < data->sps_count ){
+                parent = data->sps + data->sps_count - 1;
+            }
+            buffer = safe_realloc( buffer, len, &buffer_size );
+            if( buffer == nullptr ){
+                return -1;
+            }
+            bs_read_bytes( stream, buffer, len );
+            size_t new_len = nal_to_rbsp((char*)buffer, len);
+            bs_stream_t new_stream = bs_create( buffer, new_len * 8, 0 );
+            if( verify_nal_type( new_stream, 1, 8 ) ){
+                read_pic_parameter_set( stream, &data->pps[i], parent );
+            }
+            bs_destroy( new_stream );
+        }
+        bs_seek( stream, offset + len, BS_SEEK_SET );
+    }
+    return 0;
 }
 
 #ifdef _cplusplus
