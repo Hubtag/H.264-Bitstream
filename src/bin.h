@@ -1,7 +1,7 @@
 #ifndef BS_BIN_H
 #define BS_BIN_H
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 extern "C"{
 #endif
 
@@ -262,7 +262,7 @@ extern "C"{
 #define b11111110 "\xfe"
 #define b11111111 "\xff"
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 }
 #endif
 #endif

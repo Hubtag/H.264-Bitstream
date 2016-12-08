@@ -175,8 +175,8 @@ size_t bs_read_bytes( bs_stream_t stream, void * dest, size_t len ){
     size_t bit = stream->offset % 8;
     size_t read_len = len;
     memset( dest, 0, len );
-    if( read_len > stream->length + stream->offset ){
-        read_len = stream->length - stream->offset;
+    if( stream->offset / 8 + read_len > stream->length / 8 ){
+        read_len = stream->length / 8 - stream->offset / 8;
     }
     memcpy( out, stream->data + byte, read_len );
     //If we're not byte aligned, we need to shift everything to become byte aligned.
@@ -188,12 +188,15 @@ size_t bs_read_bytes( bs_stream_t stream, void * dest, size_t len ){
         }
         //Get the last byte
         unsigned char last = 0;
-        if( stream->offset + read_len < stream->length ){
-            last = stream->data[read_len];
+        if( stream->offset + read_len * 8 < stream->length ){
+            last = stream->data[byte + read_len];
         }
         //Fill it in
         if( read_len > 0 ){
             out[read_len - 1] = (out[read_len - 1] << bit) | ((last >> (8 - bit)) & mask );
+        }
+        else if( len > 0 ){
+            out[0] = last << bit ;
         }
     }
     return read_len;

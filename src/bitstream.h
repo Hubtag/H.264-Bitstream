@@ -2,7 +2,7 @@
 #define BS_BITSTREAM_H
 #include <string.h>
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 extern "C"{
 #endif
 
@@ -123,7 +123,7 @@ unsigned int bs_read_exp_golomb( bs_stream_t stream );
 size_t bs_read_bytes( bs_stream_t stream, void * dest, size_t len );
 
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 }
 #endif
 #endif

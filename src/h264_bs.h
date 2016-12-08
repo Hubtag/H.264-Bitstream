@@ -1,5 +1,5 @@
-#ifndef H264_RBSP_H
-#define H264_RBSP_H
+#ifndef H264_BS_H
+#define H264_BS_H
 
 #include "bitstream.h"
 #include <stdint.h>
@@ -9,13 +9,13 @@
 #define H264_LOOP_MAX 500
 #define H264_EXTENDED_SAR 255
 
-#ifdef _cplusplus
+#ifdef __cplusplus
 extern "C"{
 #endif
 
 
 
-struct hrd_parameters{
+struct h264_hrd_parameters{
     uint32_t cpb_cnt_minus1;
     uint8_t bit_rate_scale;
     uint8_t cpb_size_scale;
@@ -28,7 +28,7 @@ struct hrd_parameters{
     uint8_t time_offset_length;
 };
 
-struct vui_parameters{
+struct h264_vui_parameters{
     uint8_t aspect_ratio_idc;
     uint16_t sar_width;
     uint16_t sar_height;
@@ -45,8 +45,8 @@ struct vui_parameters{
     uint32_t num_units_in_tick;
     uint32_t time_scale;
     bool fixed_frame_rate;
-    struct hrd_parameters nal_hrd;
-    struct hrd_parameters vcl_hrd;
+    struct h264_hrd_parameters nal_hrd;
+    struct h264_hrd_parameters vcl_hrd;
     bool low_delay_hrd;
     bool pic_struct_present;
     bool motion_vectors_over_pic_boundaries;
@@ -58,7 +58,7 @@ struct vui_parameters{
     uint32_t max_dec_frame_buffering;
 };
 
-struct seq_parameter_set{
+struct h264_seq_parameter_set{
     uint8_t profile_idc;
     bool constraint_set0;
     bool constraint_set1;
@@ -94,10 +94,10 @@ struct seq_parameter_set{
     uint32_t frame_crop_right_offset;
     uint32_t frame_crop_top_offset;
     uint32_t frame_crop_bottom_offset;
-    struct vui_parameters vui;
+    struct h264_vui_parameters vui;
 };
 
-struct pic_parameter_set{
+struct h264_pic_parameter_set{
     uint32_t pic_parameter_set_id;
     uint32_t seq_parameter_set_id;
     bool entropy_coding_mode;
@@ -128,35 +128,28 @@ struct pic_parameter_set{
     int32_t second_chroma_qp_index_offset;
 };
 
-int32_t map_se(uint32_t in);
-
-int nal_to_rbsp( char * data, size_t length );
-
-int read_scaling_list( bs_stream_t stream, int32_t * delta_scale_thunk, size_t size );
-
-int read_hrd_parameters( bs_stream_t stream, struct hrd_parameters * params );
-
-int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params );
-
-int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * params );
-int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * params, struct seq_parameter_set * seq_params );
-
 #define AVCC_MAX_PPS 1
 #define AVCC_MAX_SPS 1
-struct avcc_data{
+struct h264_avcc_data{
     uint8_t version, profile, compat, level;
     int nalu_length_size_minus1;
     size_t pps_count, sps_count;
-    struct seq_parameter_set sps[AVCC_MAX_SPS];
-    struct pic_parameter_set pps[AVCC_MAX_PPS];
+    struct h264_seq_parameter_set sps[AVCC_MAX_SPS];
+    struct h264_pic_parameter_set pps[AVCC_MAX_PPS];
 };
 
-int read_avcc_data( bs_stream_t stream, struct avcc_data * data );
+int32_t h264_map_se(uint32_t in);
+int h264_nal_to_rbsp( char * data, size_t length );
+int h264_read_scaling_list( bs_stream_t stream, int32_t * delta_scale_thunk, size_t size );
+int h264_read_hrd_parameters( bs_stream_t stream, struct h264_hrd_parameters * params );
+int h264_read_vui_parameters( bs_stream_t stream, struct h264_vui_parameters * params );
+int h264_read_seq_parameter_set( bs_stream_t stream, struct h264_seq_parameter_set * params );
+int h264_read_pic_parameter_set( bs_stream_t stream, struct h264_pic_parameter_set * params, struct h264_seq_parameter_set * seq_params );
+int h264_read_avcc_data( bs_stream_t stream, struct h264_avcc_data * data );
 
-size_t get_x264_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq );
-size_t get_ffmpeg_params(char * buffer, size_t len, struct avcc_data * data );
 
-#ifdef _cplusplus
+
+#ifdef __cplusplus
 }
 #endif
 #endif

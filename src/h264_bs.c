@@ -1,4 +1,4 @@
-#include "h264_rbsp.h"
+#include "h264_bs.h"
 #include <math.h>
 #include <stdlib.h>
 
@@ -6,7 +6,7 @@
 extern "C"{
 #endif
 
-int32_t map_se(uint32_t in){
+int32_t h264_map_se(uint32_t in){
     // 0 => 0
     // 1 => 1
     // 2 => -1
@@ -21,7 +21,7 @@ int32_t map_se(uint32_t in){
     return value * remainder;
 }
 
-int nal_to_rbsp( char * data, size_t length ){
+int h264_nal_to_rbsp( char * data, size_t length ){
     size_t in, out, count;
     in = out = count = 0;
     // A NAL unit may not contain the byte sequences
@@ -59,13 +59,13 @@ int nal_to_rbsp( char * data, size_t length ){
 
 // Pretty much just a pump for the stream to make sure the bits are extracted,
 // Even though we don't do anything with them.
-int read_scaling_list( bs_stream_t stream, int32_t * delta_scale_thunk, size_t size ){
+int h264_read_scaling_list( bs_stream_t stream, int32_t * delta_scale_thunk, size_t size ){
     int32_t last_scale = 8;
     int32_t next_scale = 8;
     int32_t delta_scale;
     for( size_t i = 0; i < size; ++i ){
         if( next_scale != 0 ){
-            delta_scale = map_se( bs_read_exp_golomb( stream ) );
+            delta_scale = h264_map_se( bs_read_exp_golomb( stream ) );
             next_scale = ( last_scale + delta_scale + 256 ) % 256;
         }
         last_scale = ( next_scale == 0 ) ? last_scale : next_scale;
@@ -73,7 +73,7 @@ int read_scaling_list( bs_stream_t stream, int32_t * delta_scale_thunk, size_t s
     return 0;
 }
 
-int read_hrd_parameters( bs_stream_t stream, struct hrd_parameters * params ){
+int h264_read_hrd_parameters( bs_stream_t stream, struct h264_hrd_parameters * params ){
     memset( params, 0, sizeof * params );
     params->cpb_cnt_minus1 = bs_read_exp_golomb( stream );
     params->bit_rate_scale = bs_read_uint( stream, 4 );
@@ -100,7 +100,7 @@ int read_hrd_parameters( bs_stream_t stream, struct hrd_parameters * params ){
     return 0;
 }
 
-int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params ){
+int h264_read_vui_parameters( bs_stream_t stream, struct h264_vui_parameters * params ){
     memset( params, 0, sizeof * params );
     params->matrix_coefficients = 2;
     params->color_primaries = 2;
@@ -140,11 +140,11 @@ int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params ){
     bool present = false;
     if( bs_read_bit( stream ) ){
         present = true;
-        read_hrd_parameters( stream, &params->nal_hrd );
+        h264_read_hrd_parameters( stream, &params->nal_hrd );
     }
     if( bs_read_bit( stream ) ){
         present = true;
-        read_hrd_parameters( stream, &params->vcl_hrd );
+        h264_read_hrd_parameters( stream, &params->vcl_hrd );
     }
     if( present ){
         params->low_delay_hrd = bs_read_bit( stream );
@@ -163,7 +163,7 @@ int read_vui_parameters( bs_stream_t stream, struct vui_parameters * params ){
 }
 
 
-int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * params ){
+int h264_read_seq_parameter_set( bs_stream_t stream, struct h264_seq_parameter_set * params ){
     memset( params, 0, sizeof * params );
     params->chroma_format_idc = 1;
     params->profile_idc = bs_read_uint( stream, 8 );
@@ -196,10 +196,10 @@ int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * param
                     }
                     if( bs_read_bit( stream ) ){
                         if( i < 6 ){
-                            read_scaling_list( stream, params->delta_scale + i, 16 );
+                            h264_read_scaling_list( stream, params->delta_scale + i, 16 );
                         }
                         else {
-                            read_scaling_list( stream, params->delta_scale + i, 64 );
+                            h264_read_scaling_list( stream, params->delta_scale + i, 64 );
                         }
                     }
                 }
@@ -213,15 +213,15 @@ int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * param
     }
     else if( params->pic_order_cnt_type == 1 ){
         params->delta_pic_order_always_zero = bs_read_bit( stream );
-        params->offset_for_non_ref_pic = map_se( bs_read_exp_golomb( stream ) );
-        params->offset_for_top_to_bottom_field = map_se( bs_read_exp_golomb( stream ) );
+        params->offset_for_non_ref_pic = h264_map_se( bs_read_exp_golomb( stream ) );
+        params->offset_for_top_to_bottom_field = h264_map_se( bs_read_exp_golomb( stream ) );
         params->num_ref_frames_in_pic_order_cnt_cycle = bs_read_exp_golomb( stream );
         for( size_t i = 0; i < params->num_ref_frames_in_pic_order_cnt_cycle; ++i ){
             if( i >= H264_ARRAY_MAX ){
                 (void)bs_read_exp_golomb( stream );
             }
             else{
-                params->offset_for_ref_frame[i] = map_se( bs_read_exp_golomb( stream ) );
+                params->offset_for_ref_frame[i] = h264_map_se( bs_read_exp_golomb( stream ) );
             }
         }
     }
@@ -241,7 +241,7 @@ int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * param
         params->frame_crop_bottom_offset = bs_read_exp_golomb( stream );
     }
     if( bs_read_bit( stream ) ){
-        read_vui_parameters( stream, &params->vui );
+        h264_read_vui_parameters( stream, &params->vui );
     }
     if( bs_read_bit( stream ) ){
         bs_seek( stream, ( 8 - bs_tell(stream) % 8 ) % 8, BS_SEEK_OFFSET );
@@ -249,7 +249,7 @@ int read_seq_parameter_set( bs_stream_t stream, struct seq_parameter_set * param
     return 0;
 }
 
-bool more_rbsp_data( bs_stream_t stream ){
+static bool more_rbsp_data( bs_stream_t stream ){
     size_t offset = bs_tell( stream );
     if( bs_remaining( stream ) == 0 ){
         return false;
@@ -275,7 +275,7 @@ bool more_rbsp_data( bs_stream_t stream ){
     return set_offset - offset > 0;
 }
 
-int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * params, struct seq_parameter_set * seq_params ){
+int h264_read_pic_parameter_set( bs_stream_t stream, struct h264_pic_parameter_set * params, struct h264_seq_parameter_set * seq_params ){
     memset( params, 0, sizeof * params );
     params->pic_parameter_set_id = bs_read_exp_golomb( stream );
     params->seq_parameter_set_id = bs_read_exp_golomb( stream );
@@ -326,9 +326,9 @@ int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * param
     params->num_ref_idx_l1_default_active_minus1 = bs_read_exp_golomb( stream );
     params->weighted_pred_flag = bs_read_bit( stream );
     params->weighted_bipred_idc = bs_read_uint( stream, 2 );
-    params->pic_init_qp_minus26 = map_se( bs_read_exp_golomb( stream ) );
-    params->pic_init_qs_minus26 = map_se( bs_read_exp_golomb( stream ) );
-    params->chroma_qp_index_offset = map_se( bs_read_exp_golomb( stream ) );
+    params->pic_init_qp_minus26 = h264_map_se( bs_read_exp_golomb( stream ) );
+    params->pic_init_qs_minus26 = h264_map_se( bs_read_exp_golomb( stream ) );
+    params->chroma_qp_index_offset = h264_map_se( bs_read_exp_golomb( stream ) );
     params->deblocking_filter_control_present = bs_read_bit( stream );
     params->constrained_intra_pred = bs_read_bit( stream );
     params->redundant_pic_cnt_present = bs_read_bit( stream );
@@ -342,10 +342,10 @@ int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * param
                 int32_t temp_delta = 0;
                 if( temp_present ){
                     if( i < 6 ){
-                        read_scaling_list( stream, &temp_delta, 16 );
+                        h264_read_scaling_list( stream, &temp_delta, 16 );
                     }
                     else{
-                        read_scaling_list( stream, &temp_delta, 64 );
+                        h264_read_scaling_list( stream, &temp_delta, 64 );
                     }
                 }
                 if( i < H264_ARRAY_MAX ){
@@ -354,237 +354,32 @@ int read_pic_parameter_set( bs_stream_t stream, struct pic_parameter_set * param
                 }
             }
         }
-        params->second_chroma_qp_index_offset = map_se( bs_read_exp_golomb( stream ) );
+        params->second_chroma_qp_index_offset = h264_map_se( bs_read_exp_golomb( stream ) );
     }
     if( bs_read_bit( stream ) ){
         bs_seek( stream, ( 8 - bs_tell(stream) % 8 ) % 8, BS_SEEK_OFFSET );
     }
     return 0;
 }
-#include <stdio.h>
-#include <stdarg.h>
 
-const char * get_color_prim_name( size_t color_prim ){
-    switch( color_prim ){
-        case 1:  return "bt709";
-        case 2:  return "undef";
-        case 4:  return "bt470m";
-        case 5:  return "bt470bg";
-        case 6:  return "smpte170m";
-        case 7:  return "smpte240m";
-        case 8:  return "film";
-        case 9:  return "bt2020";
-        case 10: return "smpte428";
-        case 11: return "smpte431";
-        case 12: return "smpte432";
-        default: return "unknown";
-    }
-}
-const char * get_color_trans_name( size_t color_trans ){
-    switch( color_trans ){
-        case 1:  return "bt709";
-        case 2:  return "undef";
-        case 4:  return "bt470m";
-        case 5:  return "bt470bg";
-        case 6:  return "smpte170m";
-        case 7:  return "smpte240m";
-        case 8:  return "linear";
-        case 9:  return "log100";
-        case 10: return "log316";
-        case 11: return "iec61966-2-4";
-        case 12: return "bt1361e";
-        case 13: return "iec61966-2-1";
-        case 14: return "bt2020-10";
-        case 15: return "bt2020-12";
-        case 16: return "smpte2084";
-        case 17: return "smpte428";
-        default: return "unknown";
-    }
-}
-
-
-const char * get_color_matrix_name( size_t color_matrix ){
-    switch( color_matrix ){
-        case 0:  return "GBR";
-        case 1:  return "bt709";
-        case 2:  return "undef";
-        case 4:  return "fcc";
-        case 5:  return "bt470bg";
-        case 6:  return "smpte170m";
-        case 7:  return "smpte240m";
-        case 8:  return "YCgCo";
-        case 9:  return "bt2020nc";
-        case 10: return "bt2020c";
-        case 11: return "smpte2085";
-        default: return "unknown";
-    }
-}
-const char * get_video_fmt_name( size_t fmt ){
-    switch( fmt ){
-        case 0:  return "component";
-        case 1:  return "pal";
-        case 2:  return "ntsc";
-        case 3:  return "secam";
-        case 4:  return "mac";
-        case 5:  return "undef";
-        default: return "unknown";
-    }
-}
-
-
-
-const char * get_profile_name(size_t profile){
-    switch(profile){
-        case 66:    return "baseline";
-        case 77:    return "main";
-        case 100:   return "high";
-        case 110:   return "high10";
-        case 122:   return "high422";
-        case 244:   return "high444";
-        case 88:    return "extended";
-        case 44:    return "intra";
-        case 83:    return "scalable_baseline";
-        case 86:    return "scalable_high";
-        case 128:   return "stereo_high";
-        case 118:   return "multiview_high";
-        case 138:   return "multiview_depth_high";
-        default:    return "unknown";
-    }
-}
-
-const char * get_pix_name(struct seq_parameter_set * seq){
-    if( seq->profile_idc == 122 && seq->chroma_format_idc == 2 ){
-        if( seq->vui.video_full_range ){
-            return "yuvj422p";
-        }
-        return "yuv422p";
-    }
-    if( seq->profile_idc == 244 ){
-        return "yuv424p";
-    }
-    if( seq->vui.video_full_range ){
-        return "yuvj420p";
-    }
-    return "yuv420p";
-}
-
-
-bool get_profile_support(size_t profile){
-    switch(profile){
-        case 66: case 77: case 100: case 110:
-        case 122: case 244:
-            return true;
-        default:
-            return false;
-    }
-}
-
-size_t write_fmt( char * buffer, size_t len, size_t offset, const char * format, ... ){
-    va_list args;
-    va_start(args, format);
-    size_t write_amt = vsnprintf(nullptr, 0, format, args);
-    va_end(args);
-    if( buffer && offset < len ){
-        va_start(args, format);
-        vsnprintf(buffer + offset, len - offset, format, args);
-        va_end(args);
-    }
-    return write_amt;
-}
-
-size_t get_ffmpeg_params(char * buffer, size_t len, struct avcc_data * data ){
-    if( data->pps_count == 0 || data->sps_count == 0 ){
-        return 0;
-    }
-    struct pic_parameter_set * pic = data->pps;
-    struct seq_parameter_set * seq = data->sps;
-
-    size_t out_len = 0;
-    out_len += write_fmt( buffer, len, out_len, "-pix_fmt %s ", get_pix_name( seq ) );
-    out_len += write_fmt( buffer, len, out_len, "-profile:v %s ", get_profile_name( seq->profile_idc ) );
-    out_len += write_fmt( buffer, len, out_len, "-level %d.%d ", seq->level_idc / 10, seq->level_idc % 10 );
-    out_len += write_fmt( buffer, len, out_len, "-x264-params \"" );
-    if( out_len < len ){
-        out_len += get_x264_params( buffer + out_len, len - out_len, pic, seq );
-    }
-    else{
-        out_len += get_x264_params( nullptr, 0, pic, seq );
-    }
-    out_len += write_fmt( buffer, len, out_len, "\"" );
-    return out_len;
-}
-
-size_t get_x264_params(char * buffer, size_t len, struct pic_parameter_set * pic, struct seq_parameter_set * seq ){
-    size_t out_len = 0;
-    out_len += write_fmt( buffer, len, out_len, "chroma-qp-offset=%d:", pic->chroma_qp_index_offset + 2 );
-    out_len += write_fmt( buffer, len, out_len, "constrained-intra=%d:", pic->constrained_intra_pred );
-    out_len += write_fmt( buffer, len, out_len, "cabac=%d:", pic->entropy_coding_mode );
-    if( seq->frame_cropping_flag ){
-        out_len += write_fmt( buffer, len, out_len, "crop-rect=%d,%d,%d,%d:",
-                        seq->frame_crop_left_offset / 2,
-                        seq->frame_crop_top_offset / 2,
-                        seq->frame_crop_right_offset / 2,
-                        seq->frame_crop_bottom_offset / 2 );
-    }
-    if( seq->frame_mbs_only ){
-        out_len += write_fmt( buffer, len, out_len, "fake-interlaced=1:" );
-    }
-    out_len += write_fmt( buffer, len, out_len, "level=%d.%d:", seq->level_idc / 10, seq->level_idc % 10 );
-    if( seq->log2_max_frame_num_minus4 == 3 ){
-        out_len += write_fmt( buffer, len, out_len, "intra-refresh=1:" );
-    }
-    out_len += write_fmt( buffer, len, out_len, "crf=%d:", pic->pic_init_qp_minus26 + 26 );
-    //out_len += write_fmt( buffer, len, out_len, "qp=%d:", pic->pic_init_qp_minus26 + 26 );
-    if( pic->pic_scaling_matrix_present_flag ){
-        out_len += write_fmt( buffer, len, out_len, "cqm=jvt:" );
-    }
-    if( get_profile_support( seq->profile_idc ) ){
-        out_len += write_fmt( buffer, len, out_len, "profile=%s:", get_profile_name( seq->profile_idc ) );
-    }
-    else{
-        fprintf(stderr, "Incompatible profile \"%s\"", get_profile_name( seq->profile_idc ) );
-        return 0;
-    }
-    out_len += write_fmt( buffer, len, out_len, "8x8dct=%d:", pic->transform_8x8_mode_flag );
-    if( seq->vui.chroma_loc_info_present ){
-        out_len += write_fmt( buffer, len, out_len, "chromaloc=%d:", seq->vui.chroma_sample_loc_type_top_field );
-    }
-    if( seq->vui.color_description_present ){
-        out_len += write_fmt( buffer, len, out_len, "colormatrix=%s:", get_color_matrix_name( seq->vui.matrix_coefficients ) );
-        out_len += write_fmt( buffer, len, out_len, "colorprim=%s:", get_color_prim_name( seq->vui.color_primaries ) );
-        out_len += write_fmt( buffer, len, out_len, "transfer=%s:", get_color_trans_name( seq->vui.transfer_characteristics ) );
-    }
-    out_len += write_fmt( buffer, len, out_len, "force-cfr=%d:", seq->vui.fixed_frame_rate );
-    if( seq->vui.overscan_appropriate ){
-        out_len += write_fmt( buffer, len, out_len, "overscan=crop:" );
-    }
-    else{
-        out_len += write_fmt( buffer, len, out_len, "overscan=show:" );
-    }
-    out_len += write_fmt( buffer, len, out_len, "videoformat=%s:", get_video_fmt_name( seq->vui.video_format ) );
-    out_len += write_fmt( buffer, len, out_len, "no-weightb=%d:", !pic->weighted_bipred_idc );
-    out_len += write_fmt( buffer, len, out_len, "weightp=%d:", pic->weighted_pred_flag );
-    return out_len;
-}
-
-void * safe_realloc( void * data, size_t new_size, size_t * old_size ){
+static void * safe_realloc( void * data, size_t new_size, size_t * old_size ){
     if( new_size < *old_size ){
         return data;
     }
     if( new_size > 100000 ){
         free( data );
-        return nullptr;
+        return NULL;
     }
     void * new_data = realloc( data, new_size );
-    if( new_data == nullptr ){
+    if( new_data == NULL ){
         free( data );
-        return nullptr;
+        return NULL;
     }
     *old_size = new_size;
     return new_data;
 }
 
-bool verify_nal_type( bs_stream_t stream, size_t ref, size_t type ){
+static bool verify_nal_type( bs_stream_t stream, size_t ref, size_t type ){
     if( bs_read_bit( stream ) ){
         return false;
     }
@@ -594,10 +389,10 @@ bool verify_nal_type( bs_stream_t stream, size_t ref, size_t type ){
     return type == bs_read_uint( stream, 5 );
 }
 
-int read_avcc_data( bs_stream_t stream, struct avcc_data * data ){
+int h264_read_avcc_data( bs_stream_t stream, struct h264_avcc_data * data ){
     uint32_t version = 0;
     size_t buffer_size = 0;
-    void * buffer = safe_realloc(nullptr, 10, &buffer_size);
+    void * buffer = safe_realloc(NULL, 10, &buffer_size);
     while( version == 0 && bs_remaining( stream ) > 0 ){
         version = bs_read_uint( stream, 8 );
     }
@@ -620,45 +415,45 @@ int read_avcc_data( bs_stream_t stream, struct avcc_data * data ){
         size_t offset = bs_tell( stream );
         if( i < AVCC_MAX_SPS ){
             buffer = safe_realloc( buffer, len, &buffer_size );
-            if( buffer == nullptr ){
+            if( buffer == NULL ){
                 return -1;
             }
             bs_read_bytes( stream, buffer, len );
-            size_t new_len = nal_to_rbsp((char*)buffer, len);
+            size_t new_len = h264_nal_to_rbsp((char*)buffer, len);
             bs_stream_t new_stream = bs_create( buffer, new_len * 8, 0 );
             if( verify_nal_type( new_stream, 1, 7 ) ){
-                read_seq_parameter_set( new_stream, &data->sps[i] );
+                h264_read_seq_parameter_set( new_stream, &data->sps[i] );
             }
             bs_destroy( new_stream );
         }
-        bs_seek( stream, offset + len, BS_SEEK_SET );
+        bs_seek( stream, offset + len * 8, BS_SEEK_SET );
     }
     data->pps_count = bs_read_uint( stream, 8 );
     for( size_t i = 0; i < data->pps_count; ++i ){
         size_t len = bs_read_uint( stream, 16 );
         size_t offset = bs_tell( stream );
         if( i < AVCC_MAX_PPS ){
-            struct seq_parameter_set * parent = data->sps + i;
+            struct h264_seq_parameter_set * parent = data->sps + i;
             if( i < data->sps_count ){
                 parent = data->sps + data->sps_count - 1;
             }
             buffer = safe_realloc( buffer, len, &buffer_size );
-            if( buffer == nullptr ){
+            if( buffer == NULL ){
                 return -1;
             }
             bs_read_bytes( stream, buffer, len );
-            size_t new_len = nal_to_rbsp((char*)buffer, len);
+            size_t new_len = h264_nal_to_rbsp((char*)buffer, len);
             bs_stream_t new_stream = bs_create( buffer, new_len * 8, 0 );
             if( verify_nal_type( new_stream, 1, 8 ) ){
-                read_pic_parameter_set( stream, &data->pps[i], parent );
+                h264_read_pic_parameter_set( new_stream, &data->pps[i], parent );
             }
             bs_destroy( new_stream );
         }
-        bs_seek( stream, offset + len, BS_SEEK_SET );
+        bs_seek( stream, offset + len * 8, BS_SEEK_SET );
     }
+    free( buffer );
     return 0;
 }
-
 #ifdef _cplusplus
 }
 #endif
