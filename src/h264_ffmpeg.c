@@ -155,7 +155,7 @@ size_t h264_get_ffmpeg_params(char * buffer, size_t len, struct h264_avcc_data *
     else{
         out_len += h264_get_x264_params( NULL, 0, data );
     }
-    out_len += write_fmt( buffer, len, out_len, "\"" );
+    out_len += write_fmt( buffer, len, out_len, "\" " );
     return out_len;
 }
 
@@ -166,6 +166,9 @@ size_t h264_get_x264_params(char * buffer, size_t len, struct h264_avcc_data * d
     out_len += write_fmt( buffer, len, out_len, "chroma-qp-offset=%d:", pic->chroma_qp_index_offset + 2 );
     out_len += write_fmt( buffer, len, out_len, "constrained-intra=%d:", pic->constrained_intra_pred );
     out_len += write_fmt( buffer, len, out_len, "cabac=%d:", pic->entropy_coding_mode );
+    if( seq->constraint_set1 ){
+        out_len += write_fmt( buffer, len, out_len, "no-8x8dct=1:" );
+    }
     if( seq->frame_cropping_flag ){
         out_len += write_fmt( buffer, len, out_len, "crop-rect=%d,%d,%d,%d:",
                         seq->frame_crop_left_offset / 2,
@@ -173,13 +176,18 @@ size_t h264_get_x264_params(char * buffer, size_t len, struct h264_avcc_data * d
                         seq->frame_crop_right_offset / 2,
                         seq->frame_crop_bottom_offset / 2 );
     }
-    if( seq->frame_mbs_only ){
+    /*if( seq->frame_mbs_only ){
         out_len += write_fmt( buffer, len, out_len, "fake-interlaced=1:" );
-    }
+    }*/
     out_len += write_fmt( buffer, len, out_len, "level=%d.%d:", seq->level_idc / 10, seq->level_idc % 10 );
-    if( seq->log2_max_frame_num_minus4 == 3 ){
+    if( seq->mb_adaptive_frame_field ){
+        out_len += write_fmt( buffer, len, out_len, "tff=1:" );
+    }
+    if( seq->log2_max_frame_num_minus4 == 3 || seq->num_ref_frames_in_pic_order_cnt_cycle == 3 ){
         out_len += write_fmt( buffer, len, out_len, "intra-refresh=1:" );
     }
+    out_len += write_fmt( buffer, len, out_len, "ref=%d:", pic->num_ref_idx_l0_default_active_minus1);
+
     out_len += write_fmt( buffer, len, out_len, "crf=%d:", pic->pic_init_qp_minus26 + 26 );
     //out_len += write_fmt( buffer, len, out_len, "qp=%d:", pic->pic_init_qp_minus26 + 26 );
     if( pic->pic_scaling_matrix_present_flag ){
@@ -210,7 +218,7 @@ size_t h264_get_x264_params(char * buffer, size_t len, struct h264_avcc_data * d
     }
     out_len += write_fmt( buffer, len, out_len, "videoformat=%s:", get_video_fmt_name( seq->vui.video_format ) );
     out_len += write_fmt( buffer, len, out_len, "no-weightb=%d:", !pic->weighted_bipred_idc );
-    out_len += write_fmt( buffer, len, out_len, "weightp=%d:", pic->weighted_pred_flag );
+    out_len += write_fmt( buffer, len, out_len, "weightp=%d", pic->weighted_pred_flag );
     return out_len;
 }
 
